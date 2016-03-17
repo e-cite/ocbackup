@@ -8,6 +8,11 @@
 #
 EXITSTATUS=0
 CONFIGFILE="/etc/ocbackup.conf"
+VERSION="1.0"
+
+echo "OCBACKUP v.$VERSION"
+echo "Copyright (c) 2016 Andreas Dolp <dev[at]andreas-dolp.de>"
+
 if [ -r $CONFIGFILE ]
   then
     . $CONFIGFILE
