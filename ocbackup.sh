@@ -6,9 +6,8 @@
 #
 # Usage: See https://github.com/e-cite/ocbackup
 #
-# ### CONFIG ###
 EXITSTATUS=0
-CONFIGFILE="/home/USER/ocbackup/ocbackup.conf"
+CONFIGFILE="/etc/ocbackup.conf"
 if [ -r $CONFIGFILE ]
   then
     . $CONFIGFILE
@@ -21,6 +20,7 @@ fi
 echo "OCBACKUP: Backing up database $DB_Database on server $DB_Server as user $DB_User."
 DIR="${BAKDIR}"
 FILE="owncloud-sqlbkp_`date +"%Y%m%d_%H%M%S"`.bak.gz"
+
 # Check existence of directory
 if [ !  -d $DIR ]
   then
@@ -35,11 +35,12 @@ if [ "$?" -ne "0" ]
     logger -s "OCBACKUP ERROR: Unable to enable maintenance mode. Aborting..."
     exit 3
 fi
+
 # Sleep 2 min
 echo "OCBACKUP: Sleeping 2 min to ensure all users are offline..."
-sleep 2
-#sleep 2m
+sleep 2m
 
+# Dumping mySQL database and gzip
 mysqldump --lock-tables -h $DB_Server -u $DB_User --password=$DB_Password $DB_Database  | gzip > $DIR$FILE
 if [ "$?" -ne "0" ]
   then
@@ -54,7 +55,7 @@ chmod 640 $DIR$FILE
 if [ "$?" -ne "0" ]
   then
     logger -s "OCBACKUP ERROR: Unable to set stron permissions of backup file $FILE. Backup successfull!"
-    EXITSTATUS 1
+    EXITSTATUS=1
 fi
 
 # Disable maintenance mode
@@ -62,7 +63,7 @@ php -f $OC_OCCPATH maintenance:mode --off
 if [ "$?" -ne "0" ]
   then
     logger -s "OCBACKUP ERROR: Unable to disable maintenance mode. Backup successfull!"
-    EXITSTATUS 1
+    EXITSTATUS=1
 fi
 
 if [ $EXITSTATUS -eq "0" ]
