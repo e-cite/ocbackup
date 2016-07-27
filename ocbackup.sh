@@ -8,7 +8,10 @@
 #
 EXITSTATUS=0
 CONFIGFILE="/etc/ocbackup.conf"
-VERSION="1.0"
+VERSION="1.1"
+
+# Set abort options for erroneous commands / pipes
+set -o pipefail
 
 echo "OCBACKUP v.$VERSION"
 echo "Copyright (c) 2016 Andreas Dolp <dev[at]andreas-dolp.de>"
@@ -22,7 +25,14 @@ if [ -r $CONFIGFILE ]
     exit 3
 fi
 
-echo "OCBACKUP: Backing up database $DB_Database on server $DB_Server as user $DB_User."
+if [ -r $DB_CredentialsFile ]
+  then
+    echo "OCBACKUP OK: MySQL credentials file loaded correctly."
+  else
+    logger -s "OCBACKUP ERROR: MySQL credentials file $DB_CredentialsFile not readable! Aborting..."
+    exit 3
+fi
+
 DIR="${BAKDIR}"
 FILE="owncloud-sqlbkp_`date +"%Y%m%d_%H%M%S"`.bak.gz"
 
@@ -46,21 +56,26 @@ echo "OCBACKUP: Sleeping 2 min to ensure all users are offline..."
 sleep 2m
 
 # Dumping mySQL database and gzip
-mysqldump --lock-tables -h $DB_Server -u $DB_User --password=$DB_Password $DB_Database  | gzip > $DIR$FILE
+# --defaults-extra-file must be the first option
+mysqldump --defaults-extra-file=$DB_CredentialsFile --lock-tables $DB_Database  | gzip > $DIR$FILE
 if [ "$?" -ne "0" ]
   then
-    logger -s "OCBACKUP ERROR: Error during mysqldump. Backup maybe not created correctly!"
+    logger -s "OCBACKUP ERROR: Error during mysqldump. Backup not created!"
+    rm $DIR$FILE
     EXITSTATUS=2
   else
     echo "OCBACKUP OK: Backup created successfully!"
 fi
 
 # Set strong permissions of backup file
-chmod 640 $DIR$FILE
-if [ "$?" -ne "0" ]
+if [ -w $DIR$FILE ]
   then
-    logger -s "OCBACKUP ERROR: Unable to set stron permissions of backup file $FILE. Backup successfull!"
-    EXITSTATUS=1
+    chmod 640 $DIR$FILE
+    if [ "$?" -ne "0" ]
+      then
+        logger -s "OCBACKUP ERROR: Unable to set strong permissions of backup file $FILE. Backup successfull!"
+        EXITSTATUS=1
+    fi
 fi
 
 # Disable maintenance mode
